@@ -14,9 +14,30 @@ public class AnimationController : MonoBehaviourPunCallbacks
     {
         if (!photonView.IsMine) return;
 
-        if (Input.GetKeyDown(KeyCode.E))
+        animator.SetBool("f",false);
+        animator.SetBool("b",false);
+        animator.SetBool("r",false);
+        animator.SetBool("l",false);
+        animator.SetBool("j",false);
+        if (Input.GetKey(KeyCode.W))
         {
-            animator.SetTrigger("E");
+            animator.SetBool("f",true);
+        }
+        if (Input.GetKey(KeyCode.S))
+        {
+            animator.SetBool("b",true);
+        }
+        if (Input.GetKey(KeyCode.A))
+        {
+            animator.SetBool("l",true);
+        }
+        if (Input.GetKey(KeyCode.D))
+        {
+            animator.SetBool("r",true);
+        }
+        if(Input.GetKey(KeyCode.Space))
+        {
+            animator.SetBool("j",true);
         }
     }
 }

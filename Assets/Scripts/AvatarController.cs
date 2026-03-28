@@ -22,8 +22,12 @@ public class AvatarController : MonoBehaviourPunCallbacks
             velocity.x += 1;
         if(Input.GetKey(KeyCode.Space))
             velocity.y += 1;
-
-        velocity = velocity.normalized * moveSpeed * Time.deltaTime;
+        if(Input.GetKey(KeyCode.S)){
+            velocity = velocity.normalized * moveSpeed/2 * Time.deltaTime;
+            }else{
+            velocity = velocity.normalized * moveSpeed * Time.deltaTime;
+            }
+        
 
         if(velocity.magnitude > 0)
         {
