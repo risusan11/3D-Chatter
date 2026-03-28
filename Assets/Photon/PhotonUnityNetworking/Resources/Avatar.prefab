@@ -17,6 +17,9 @@ GameObject:
   - component: {fileID: 4277110819534999700}
   - component: {fileID: 7112898495224120180}
   - component: {fileID: 4172290139154815716}
+  - component: {fileID: 140236998613394298}
+  - component: {fileID: 5887549495468503410}
+  - component: {fileID: -6872481758007055347}
   m_Layer: 0
   m_Name: Avatar
   m_TagString: Untagged
@@ -132,6 +135,7 @@ MonoBehaviour:
   observableSearch: 2
   ObservedComponents:
   - {fileID: 4277110819534999700}
+  - {fileID: -6872481758007055347}
   sceneViewId: 0
   InstantiationId: 0
   isRuntimeInstantiated: 0
@@ -202,6 +206,63 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: fd0b2f40170cbde459c299d96c864387, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+--- !u!95 &140236998613394298
+Animator:
+  serializedVersion: 5
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2833511768197866742}
+  m_Enabled: 1
+  m_Avatar: {fileID: 0}
+  m_Controller: {fileID: 9100000, guid: 2fa1f913b772aff4bb1330cb4054f60f, type: 2}
+  m_CullingMode: 0
+  m_UpdateMode: 0
+  m_ApplyRootMotion: 0
+  m_LinearVelocityBlending: 0
+  m_StabilizeFeet: 0
+  m_WarningMessage: 
+  m_HasTransformHierarchy: 1
+  m_AllowConstantClipSamplingOptimization: 1
+  m_KeepAnimatorStateOnDisable: 0
+  m_WriteDefaultValuesOnDisable: 0
+--- !u!114 &5887549495468503410
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2833511768197866742}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: dd4e59d40dc50414387135c38bf02aae, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+--- !u!114 &-6872481758007055347
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2833511768197866742}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9b8c4a61274f60b4ea5fb4299cfdbf14, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  ShowLayerWeightsInspector: 1
+  ShowParameterInspector: 1
+  m_SynchronizeParameters:
+  - Type: 4
+    SynchronizeType: 1
+    Name: isE
+  - Type: 9
+    SynchronizeType: 1
+    Name: E
+  m_SynchronizeLayers:
+  - SynchronizeType: 0
+    LayerIndex: 0
 --- !u!1 &4693200818791335633
 GameObject:
   m_ObjectHideFlags: 0
