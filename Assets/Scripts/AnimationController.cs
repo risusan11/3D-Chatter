@@ -13,6 +13,7 @@ public class AnimationController : MonoBehaviourPunCallbacks
     void Update()
     {
         if (!photonView.IsMine) return;
+        if (RealisingMessageController.isChatting) return;
 
         animator.SetBool("f",false);
         animator.SetBool("b",false);
