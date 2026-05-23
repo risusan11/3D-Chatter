@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.EventSystems; // Required for UI checks
 using Painter3D;
 
 public class BrushController_Mouse3D : MonoBehaviour
@@ -22,38 +23,49 @@ public class BrushController_Mouse3D : MonoBehaviour
 
     private void Awake()
     {
-        if (targetCamera == null)
-        {
-            targetCamera = Camera.main;
-        }
+        if (targetCamera == null) targetCamera = Camera.main;
 
+        // Create the tip and parent it to this object to prevent hierarchy clutter and memory leaks
         GameObject tipObj = new GameObject("Mouse3D_BrushTip");
         brushTip = tipObj.transform;
+        brushTip.SetParent(this.transform);
+    }
+
+    private void OnDestroy()
+    {
+        // Safety cleanup if the tip was unparented for any reason
+        if (brushTip != null) Destroy(brushTip.gameObject);
     }
 
     private void Update()
     {
+        if(RealisingMessageController.isidel) return; // ロード後はこのスクリプトの処理を止める
         if (targetCamera == null || brush == null) return;
 
         UpdateDepth();
         UpdateBrushTipPosition();
 
-        bool isDrawing = Input.GetMouseButton(0);
+        // Check if mouse is down AND make sure we aren't clicking on a UI element
+        bool isPointerOverUI = EventSystem.current != null && EventSystem.current.IsPointerOverGameObject();
+        bool isDrawing = Input.GetMouseButton(0) && !isPointerOverUI && Application.isFocused;
 
+        // Stroke Logic
         if (isDrawing && !wasDrawing)
         {
             brush.BeginStroke(brushTip);
+            wasDrawing = true;
         }
         else if (isDrawing && wasDrawing)
         {
             brush.UpdateStroke();
         }
-        else if (!isDrawing && wasDrawing)
+        else if (!Input.GetMouseButton(0) && wasDrawing) 
         {
+            // Explicitly checking GetMouseButton(0) being false ensures the stroke ends 
+            // even if the user dragged over UI mid-stroke.
             brush.EndStroke();
+            wasDrawing = false;
         }
-
-        wasDrawing = isDrawing;
     }
 
     private void UpdateDepth()
@@ -72,9 +84,6 @@ public class BrushController_Mouse3D : MonoBehaviour
     private void UpdateBrushTipPosition()
     {
         Vector3 mouseScreenPos = Input.mousePosition;
-
-        // ここが重要。
-        // mouse x/y は画面座標、z は「カメラから何m先か」
         mouseScreenPos.z = drawDepthFromCamera;
 
         Vector3 worldPos = targetCamera.ScreenToWorldPoint(mouseScreenPos);

@@ -132,15 +132,14 @@ namespace Painter3D
 
         public void EmitAtStrokeNode(StrokeNode node, int randomSeed)
         {
-            m_EmitParams.position = node.ModifiedPos;
+            // ローカル座標→ワールド座標に変換
+            m_EmitParams.position = m_Stroke.transform.TransformPoint(node.ModifiedPos);
 
-            // Rotation 
             if (m_3DRotation)
                 m_EmitParams.rotation3D = node.ModifiedRot.eulerAngles;
             else
                 m_EmitParams.rotation = -node.ModifiedRot.eulerAngles.z;
 
-            // Scale
             float scale = node.ModifiedScale.x;
             m_EmitParams.startSize = scale;
 

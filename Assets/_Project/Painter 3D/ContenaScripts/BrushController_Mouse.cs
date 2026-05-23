@@ -11,16 +11,55 @@ namespace Painter3D
         public Transform m_BrushTip;
         public bool m_UpdateFacing = false;
         float m_Depth = 3;
-        public float m_Smoothing = 2;
+        public float m_Smoothing = 0f;
 
+        public float maxReach = 10f; 
+
+        public bool is3DMode = true; 
+
+        // ★★★ ここを追加：Raycastから除外するレイヤーを指定する ★★★
+        public LayerMask drawLayerMask = ~0; 
+        // ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
+
+        private void Awake()
+    {
+        if (m_Cam == null)
+        {
+            m_Cam = GetComponentInChildren<Camera>();
+        }
+
+        if (m_Cam == null)
+        {
+            m_Cam = Camera.main;
+        }
+
+        if (m_Cam == null)
+        {
+            Debug.LogError("BrushController_Mouse: Camera が見つかりません。Playerプレハブ内のCameraを m_Cam に設定してください。", this);
+        }
+    }
         void Start()
         {
-            m_BrushTip = transform;
+            // 強制上書きを削除し、未設定の場合のみ自分を代入する
+            if (m_BrushTip == null)
+            {
+                m_BrushTip = transform;
+            }
+            
+            // Brush.csの初期化に合わせてサイズ設定を同期
+            if (m_Brush != null)
+            {
+                m_Brush.BrushSize = m_Brush.BrushSize; 
+            }
         }
 
         // Update is called once per frame
         void Update()
-        {          
+        {    
+            if(RealisingMessageController.isidel) return; // ロード後はこのスクリプトの処理を止める   
+
+            if (RealisingMessageController.isCanvas2Active || RealisingMessageController.isChatting) return;
+
             m_Brush.m_InputOverUI = false; // No UI in project, so always allow input
 
             UpdateBrushTipTransformFromMouse();
@@ -64,18 +103,43 @@ namespace Painter3D
 
         void UpdateBrushTipTransformFromMouse()
         {
-            Vector3 targetPos = m_Cam.ScreenToWorldPoint(new Vector3(Input.mousePosition.x, Input.mousePosition.y, m_Depth));
+            Ray ray = m_Cam.ScreenPointToRay(Input.mousePosition);
+            Vector3 targetPos;
+            string debugInfo = "";
 
-            if (m_Smoothing != 0)
-                targetPos = Vector3.Lerp(transform.position, targetPos, Time.deltaTime * m_Smoothing);
-
-            // Update the rotation of the brush tip
-            if (m_UpdateFacing && Vector3.Distance(targetPos, m_BrushTip.position) > .01f)
+            if (is3DMode)
             {
-                UpdateTipAngleOnXY(m_BrushTip.transform.position, targetPos);
+                RaycastHit hit;
+                if (Physics.Raycast(ray, out hit, maxReach, drawLayerMask))
+                {
+                    debugInfo = $"命中: {hit.collider.name} | hit.point={hit.point} | distance={hit.distance}";
+                    targetPos = hit.point + hit.normal * 0.01f;
+                    m_BrushTip.rotation = Quaternion.LookRotation(hit.normal);
+                }
+                else
+                {
+                    debugInfo = "ハズレ（空中描画）";
+                    targetPos = ray.GetPoint(m_Depth);
+                    m_BrushTip.rotation = m_Cam.transform.rotation;
+                }
+            }
+            else
+            {
+                debugInfo = "2Dモード";
+                targetPos = ray.GetPoint(m_Depth);
+                m_BrushTip.rotation = m_Cam.transform.rotation;
             }
 
+            if (m_Smoothing > Mathf.Epsilon)
+                targetPos = Vector3.Lerp(m_BrushTip.position, targetPos, Time.deltaTime * m_Smoothing);
+
             transform.position = targetPos;
+
+            // クリック時だけログ出力（毎フレーム出ると多すぎるため）
+            if (Input.GetMouseButtonDown(0))
+            {
+                Debug.Log($"[クリック時] {debugInfo} → 最終transform.position={transform.position}");
+            }
         }
         
         void UpdateTipAngleOnXY(Vector3 currentPos, Vector3 targetPos)

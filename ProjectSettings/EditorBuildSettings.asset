@@ -9,6 +9,9 @@ EditorBuildSettings:
     path: Assets/Scenes/Start.unity
     guid: 14a7a219cb3b32d4b9cf2c0d1e53a3cb
   - enabled: 1
+    path: Assets/Scenes/2DCanvas.unity
+    guid: 721aec2bd7c37a448a4fa5b48c8802b4
+  - enabled: 1
     path: Assets/Scenes/Main.unity
     guid: 59d73beb87c5397439b5b25a508ce203
   - enabled: 1

@@ -12,17 +12,15 @@ namespace Painter3D
         {
             base.DrawStroke(forceRedraw);
 
-            // Set line renderer number of positions
             m_LineRenderer.positionCount = m_Stroke.RawNodeCount;
-
-            //float size = m_Stroke.RawMatracies[0].GetScale().x.ScaleFrom01(m_ScaleRange.x, m_ScaleRange.y);
-
             m_LineRenderer.startWidth = AdjustedScale;
             m_LineRenderer.endWidth = AdjustedScale;
 
             for (int i = 0; i < m_Stroke.RawNodeCount; i++)
             {
-                m_LineRenderer.SetPosition(i, m_Stroke.GetPositionAt(i));                
+                // ローカル座標をワールド座標に変換してセット
+                Vector3 worldPos = m_Stroke.transform.TransformPoint(m_Stroke.GetPositionAt(i));
+                m_LineRenderer.SetPosition(i, worldPos);
             }
         }
 

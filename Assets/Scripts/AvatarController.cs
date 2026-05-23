@@ -8,6 +8,7 @@ public class AvatarController : MonoBehaviourPunCallbacks
 
     private void Update() 
     {
+        if (RealisingMessageController.isidel) return; // ロード後はこのスクリプトの処理を止める
         if (!photonView.IsMine) return;
         if (RealisingMessageController.isChatting) return;
 
