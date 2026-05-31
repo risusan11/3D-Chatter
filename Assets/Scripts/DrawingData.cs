@@ -7,10 +7,8 @@ public class StrokePointData
 {
     public float x;
     public float y;
-
     public StrokePointData() { }
     public StrokePointData(float x, float y) { this.x = x; this.y = y; }
-
     public Vector3 ToLocalVector3(float halfSize) =>
         new Vector3(x * halfSize, 0f, y * halfSize);
 }
@@ -28,14 +26,16 @@ public class DrawingData
 {
     public List<StrokeData> strokes = new List<StrokeData>();
 
+    // ✅ 【追加】2Dキャンバスのアスペクト比（Screen.width / Screen.height）
+    //    画面が16:9なら 1.78。これがないと縦方向のブラシ太さが不足して隙間ができる。
+    //    旧データとの互換性のため、0 や未設定の場合は 1.0（正方形）扱い。
+    public float aspectRatio = 1.0f;
+
     public string ToJson(bool prettyPrint = false) =>
         JsonUtility.ToJson(this, prettyPrint);
-
     public static DrawingData FromJson(string json) =>
         JsonUtility.FromJson<DrawingData>(json);
-
     public bool IsEmpty => strokes == null || strokes.Count == 0;
-
     public int TotalPoints
     {
         get

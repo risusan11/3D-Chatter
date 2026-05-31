@@ -217,38 +217,60 @@ public class RealisingMessageController : MonoBehaviourPunCallbacks
         }
     }
 
-    void OnClickSend()
+void OnClickSend()
+{
+    if (InnerText == null || string.IsNullOrEmpty(InnerText.text))
     {
-        if (InnerText == null || string.IsNullOrEmpty(InnerText.text))
-        {
-            CancelChat();
-            return;
-        }
-        
-        if (photonView == null) return;
-        if (PhotonNetwork.LocalPlayer == null) return;
-        
-        // 💡 シーンに1つしかない共有オブジェクトのPhotonViewを介して、誰のPCからでも全員の画面へチャットを送信！
-        photonView.RPC(nameof(MakeText), RpcTarget.All,
-            PhotonNetwork.LocalPlayer.NickName + PhotonNetwork.LocalPlayer.ActorNumber,
-            InnerText.text
-        );
+        CancelChat();
+        return;
     }
 
-    [PunRPC]
-    void MakeText(string name, string message)
+    if (photonView == null) return;
+    if (PhotonNetwork.LocalPlayer == null) return;
+    
+    // 💡 【修正ポイント】送信するテキストを一度変数に保存する
+    string sendText = InnerText.text;
+    
+    // 送信データを確保した後に、入力欄を綺麗にする
+    InnerText.text = "";
+    
+    // 保存しておいた「sendText」をRPCで送信する
+    photonView.RPC(nameof(MakeText), RpcTarget.All,
+        PhotonNetwork.LocalPlayer.NickName + " (" + PhotonNetwork.LocalPlayer.ActorNumber + ")",
+        sendText
+    );
+}
+
+[PunRPC]
+void MakeText(string name, string message)
+{
+    if (prefab_A == null || content == null) return;
+
+    GameObject othersMessage = Instantiate(prefab_A, content, false);
+    othersMessage.SetActive(true);
+
+    Transform nameTransform = othersMessage.transform.Find("PlayerPanel/PlayerName");
+    Transform msgTransform = othersMessage.transform.Find("player-message");
+
+    // 🛠️ エラー特定を容易にするため、見つからない場合の警告を追加
+    if (nameTransform != null)
     {
-        if (prefab_A == null || content == null) return;
-
-        GameObject othersMessage = Instantiate(prefab_A, content, false);
-        othersMessage.SetActive(true);
-
-        Transform nameTransform = othersMessage.transform.Find("PlayerPanel/PlayerName");
-        Transform msgTransform = othersMessage.transform.Find("player-message");
-
-        if (nameTransform != null) nameTransform.GetComponent<Text>().text = name;
-        if (msgTransform != null) msgTransform.GetComponent<Text>().text = message;
-
-        LayoutRebuilder.ForceRebuildLayoutImmediate(content);
+        nameTransform.GetComponent<Text>().text = name;
     }
+    else
+    {
+        Debug.LogError("プレハブ内に 'PlayerPanel/PlayerName' が見つかりません！");
+    }
+
+    if (msgTransform != null)
+    {
+        msgTransform.GetComponent<Text>().text = message;
+    }
+    else
+    {
+        Debug.LogError("プレハブ内に 'player-message' が見つかりません！");
+    }
+
+    LayoutRebuilder.ForceRebuildLayoutImmediate(content);
+}
 }

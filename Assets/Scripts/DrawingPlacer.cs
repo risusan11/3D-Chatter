@@ -29,7 +29,6 @@ public class DrawingPlacer : MonoBehaviourPun
 
     [Header("プレビュー外観")]
     [SerializeField] private Color previewTint = new Color(1f, 0.95f, 0.3f, 0.85f);
-    [SerializeField] private float previewWidth = 0.012f;
 
     [Header("🧹 消しゴム詳細設定")]
     [SerializeField] private KeyCode eraserKey = KeyCode.E;
@@ -44,7 +43,15 @@ public class DrawingPlacer : MonoBehaviourPun
     // ────────────────────────────────────────────
     private DrawingData drawingData;
     private GameObject previewRoot;
-    private List<LineRenderer> previewLines = new List<LineRenderer>();
+
+    // ✅ プレビューもテクスチャクワッド方式に変更（配置後と完全に同じ見た目）
+    private GameObject   previewQuad;
+    private MeshRenderer previewQuadRenderer;
+    private Texture2D    previewTexture;
+
+    [Header("プレビュー解像度")]
+    [Tooltip("プレビューテクスチャ解像度（PlacedDrawing と同じ値推奨）")]
+    [SerializeField] private int previewTextureSize = 1024;
 
     private Vector3 hitPoint;
     private Vector3 hitNormal;
@@ -172,7 +179,7 @@ public class DrawingPlacer : MonoBehaviourPun
             {
                 drawingData = DrawingManager.Instance.CurrentDrawing;
                 previewRoot = new GameObject("DrawingPreview");
-                BuildPreviewLines();
+                BuildPreviewQuad();
             }
             else
             {
@@ -238,7 +245,7 @@ public class DrawingPlacer : MonoBehaviourPun
     //   見つけた線が 3D 描画線        → 直接 Destroy（ローカル描画の場合）
     // ────────────────────────────────────────────
 
-private void HandleEraserModeScreenSpace()
+    private void HandleEraserModeScreenSpace()
     {
         if (playerCamera == null) return;
 
@@ -259,24 +266,32 @@ private void HandleEraserModeScreenSpace()
 
         foreach (LineRenderer lr in cachedAllLRs)
         {
+            // ✅ Destroy 済み・非アクティブはスキップ
             if (lr == null || !lr.gameObject.activeInHierarchy) continue;
+
+            // プレビュー用の LineRenderer は消去対象から除外
             if (previewRoot != null && lr.transform.IsChildOf(previewRoot.transform)) continue;
 
             for (int p = 0; p < lr.positionCount; p++)
             {
+                // ✅ useWorldSpace を正しく判定して「確実にワールド座標」を取得する
+                //    PlacedDrawing  → useWorldSpace = false（ローカル座標）
+                //    Simple3DPainter → useWorldSpace = true（ワールド座標）
                 Vector3 worldPos = lr.useWorldSpace
                     ? lr.GetPosition(p)
                     : lr.transform.TransformPoint(lr.GetPosition(p));
 
                 Vector3 screenPos3D = playerCamera.WorldToScreenPoint(worldPos);
-                if (screenPos3D.z <= 0f) continue; 
+                if (screenPos3D.z <= 0f) continue; // カメラ背後は無視
 
                 float pixelDist = Vector2.Distance(mousePos, new Vector2(screenPos3D.x, screenPos3D.y));
 
                 if (pixelDist < minPixelDist)
                 {
-                    minPixelDist     = pixelDist;
-                    closestLR        = lr;
+                    minPixelDist    = pixelDist;
+                    closestLR       = lr;
+
+                    // この LR が PlacedDrawing の子かどうかを判定
                     closestDrawing   = lr.GetComponentInParent<PlacedDrawing>();
                     closestStrokeIdx = (closestDrawing != null)
                         ? closestDrawing.LineRenderers.IndexOf(lr)
@@ -285,15 +300,36 @@ private void HandleEraserModeScreenSpace()
             }
         }
 
-        // ── ハイライトの更新 ──
+        // ── ハイライトの更新（前フレームから変化があった時だけ処理）──
         if (closestLR != hoveredLR)
         {
-            RestoreHoveredColor();
-
-            if (closestLR != null && closestLR.material != null)
+            // ── 前回のハイライトを解除 ──
+            // ✅ PlacedDrawing 由来 → テクスチャ方式のハイライト解除
+            //    Simple3DPainter 由来 → マテリアル色を元に戻す
+            if (hoveredDrawing != null)
             {
-                hoveredOrigColor = closestLR.material.color;
-                closestLR.material.color = eraserHighlightColor;
+                hoveredDrawing.ClearHighlight();
+            }
+            else if (hoveredLR != null && hoveredLR.material != null)
+            {
+                hoveredLR.material.color = hoveredOrigColor;
+            }
+
+            // ── 新しい対象をハイライト ──
+            if (closestLR != null)
+            {
+                if (closestDrawing != null && closestStrokeIdx >= 0)
+                {
+                    // ✅ PlacedDrawing：テクスチャを再描画してハイライト
+                    //    （透明な検出用 LR の material.color は触らない！）
+                    closestDrawing.HighlightStroke(closestStrokeIdx, eraserHighlightColor);
+                }
+                else if (closestLR.material != null)
+                {
+                    // Simple3DPainter の 3D 線：従来通りマテリアル色を直接変更
+                    hoveredOrigColor = closestLR.material.color;
+                    closestLR.material.color = eraserHighlightColor;
+                }
             }
 
             hoveredLR          = closestLR;
@@ -310,11 +346,13 @@ private void HandleEraserModeScreenSpace()
                 if (hoveredDrawing != null && hoveredStrokeIndex >= 0)
                 {
                     // ────────────────────────────────────
-                    // ケース A: PlacedDrawing の線（変更なし）
+                    // ケース A: PlacedDrawing の線
+                    // RPC で全クライアントに消去を同期
                     // ────────────────────────────────────
                     PlacedDrawing target = hoveredDrawing;
                     int           idx    = hoveredStrokeIndex;
 
+                    // 先に参照をクリア（二重処理防止）
                     hoveredLR          = null;
                     hoveredDrawing     = null;
                     hoveredStrokeIndex = -1;
@@ -329,32 +367,25 @@ private void HandleEraserModeScreenSpace()
                 else
                 {
                     // ────────────────────────────────────
-                    // ケース B: ✨【マルチ同期に完全修正！】Simple3DPainter の 3D 線
+                    // ケース B: Simple3DPainter 等の 3D 線
+                    // 直接 Destroy で消去
                     // ────────────────────────────────────
                     LineRenderer toErase = hoveredLR;
 
+                    // 先に参照をクリア
                     hoveredLR          = null;
                     hoveredDrawing     = null;
                     hoveredStrokeIndex = -1;
 
                     if (toErase != null)
                     {
-                        // 💡 1. 狙った3D線が「誰のアバターオブジェクトに属しているか」を親から逆算特定する
-                        Simple3DPainter ownerPainter = toErase.GetComponentInParent<Simple3DPainter>();
-                        if (ownerPainter != null)
-                        {
-                            // 💡 2. そのアバターが持つ3D線リストから、狙った線のインデックス（背番号）を割り出す
-                            int strokeIdx = ownerPainter.ActiveLines.IndexOf(toErase);
-                            if (strokeIdx != -1)
-                            {
-                                // 🚀 3. 線の持ち主のアバターが持つ PhotonView を仲介して、全員の画面で一斉消去RPCを発動！
-                                ownerPainter.GetComponent<PhotonView>().RPC("Erase3DStrokeRemote", RpcTarget.All, strokeIdx);
-                                Debug.Log($"[3D消しゴム同期] 3D空中線番号 {strokeIdx} をネットワーク一斉消去要請しました。");
-                            }
-                        }
+                        if (toErase.material != null) Destroy(toErase.material);
+                        Destroy(toErase.gameObject);
+                        Debug.Log("[DrawingPlacer] 3D 空中線を直接消去しました。");
                     }
                 }
 
+                // 消去後はキャッシュを即座に無効化して次フレームで再スキャン
                 cachedAllLRs = null;
             }
         }
@@ -366,8 +397,16 @@ private void HandleEraserModeScreenSpace()
 
     private void RestoreHoveredColor()
     {
-        if (hoveredLR != null && hoveredLR.material != null)
+        // ✅ PlacedDrawing 由来 → テクスチャ方式のハイライト解除
+        if (hoveredDrawing != null)
+        {
+            hoveredDrawing.ClearHighlight();
+        }
+        // Simple3DPainter 由来 → マテリアル色を元に戻す
+        else if (hoveredLR != null && hoveredLR.material != null)
+        {
             hoveredLR.material.color = hoveredOrigColor;
+        }
 
         hoveredLR          = null;
         hoveredDrawing     = null;
@@ -408,90 +447,86 @@ private void HandleEraserModeScreenSpace()
     }
 
     // ────────────────────────────────────────────
-    // プレビュー（TabPlacement 用）
+    // プレビュー（TabPlacement 用）— テクスチャクワッド方式
     // ────────────────────────────────────────────
 
-private void BuildPreviewLines()
+    private void BuildPreviewQuad()
     {
-        if (drawingData == null) return;
+        if (drawingData == null || previewRoot == null) return;
 
-        Material mat = CreateMaterial(previewTint);
-        
-        // 💡 配置後（PlacedDrawing.cs）の設定（0.012f）と完全にシンクロさせる
-        float lineWidth = drawingWorldSize * 0.012f; 
+        // ① テクスチャを焼く（全ストロークを previewTint 単色で）
+        previewTexture = StrokeTextureRenderer.RenderWithUniformColor(
+            drawingData, previewTextureSize, previewTint);
 
-        for (int i = 0; i < drawingData.strokes.Count; i++)
+        // ② クワッドメッシュを生成
+        float h = drawingWorldSize * 0.5f;
+        Mesh mesh = new Mesh { name = "PreviewQuad" };
+        mesh.vertices = new Vector3[]
         {
-            var stroke = drawingData.strokes[i];
-            if (stroke.points.Count < 1) continue;
+            new Vector3(-h, surfaceOffset, -h),
+            new Vector3( h, surfaceOffset, -h),
+            new Vector3(-h, surfaceOffset,  h),
+            new Vector3( h, surfaceOffset,  h),
+        };
+        mesh.uv = new Vector2[]
+        {
+            new Vector2(0, 0),
+            new Vector2(1, 0),
+            new Vector2(0, 1),
+            new Vector2(1, 1),
+        };
+        mesh.triangles = new int[] { 0, 2, 1, 2, 3, 1,   // 表
+                                     0, 1, 2, 2, 1, 3 };  // 裏
+        mesh.RecalculateNormals();
 
-            var go = new GameObject("PL_Stroke");
-            go.transform.SetParent(previewRoot.transform, false);
+        previewQuad = new GameObject("PreviewQuad");
+        previewQuad.transform.SetParent(previewRoot.transform, false);
 
-            var lr = go.AddComponent<LineRenderer>();
-            lr.useWorldSpace     = true;
-            
-            // 🛠️【太さバグ修正】プレビュー生成の瞬間から、配置後と全く同じ数式で太さを計算して割り当てる！
-            float w = Mathf.Max(lineWidth * stroke.normalizedWidth * 50f, lineWidth * 0.5f);
-            lr.startWidth        = w;
-            lr.endWidth          = w;
-            
-            lr.material          = mat;
-            lr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
-            lr.receiveShadows    = false;
-            lr.positionCount     = stroke.points.Count;
+        var mf = previewQuad.AddComponent<MeshFilter>();
+        mf.mesh = mesh;
 
-            previewLines.Add(lr);
-        }
+        var mat = new Material(Shader.Find("Sprites/Default"));
+        mat.mainTexture = previewTexture;
+        mat.color       = Color.white;
+
+        previewQuadRenderer = previewQuad.AddComponent<MeshRenderer>();
+        previewQuadRenderer.material            = mat;
+        previewQuadRenderer.shadowCastingMode   = UnityEngine.Rendering.ShadowCastingMode.Off;
+        previewQuadRenderer.receiveShadows      = false;
     }
 
-private void UpdatePreview()
+    private void UpdatePreview()
     {
-        if (previewRoot == null || drawingData == null) return;
+        if (previewRoot == null || previewQuad == null) return;
 
         SetPreviewVisible(true);
-        float halfSize = drawingWorldSize * 0.5f;
-        Vector3 right  = hitRotation * Vector3.right;
-        Vector3 fwd    = hitRotation * Vector3.forward;
-        Vector3 up     = hitNormal;
 
-        // 💡 配置後（PlacedDrawing.cs）の太さ計算ロジックと100%完全に一致させる
-        float lineWidth = drawingWorldSize * 0.012f; 
-
-        for (int si = 0; si < previewLines.Count && si < drawingData.strokes.Count; si++)
-        {
-            var stroke = drawingData.strokes[si];
-            var lr     = previewLines[si];
-            lr.positionCount = stroke.points.Count;
-
-            // 🛠️【太さバグ修正】構えている間も、2D側から届いた太さを毎フレーム完全に適用！
-            float w = Mathf.Max(lineWidth * stroke.normalizedWidth * 50f, lineWidth * 0.5f);
-            lr.startWidth = lr.endWidth = w;
-
-            for (int pi = 0; pi < stroke.points.Count; pi++)
-            {
-                var pt = stroke.points[pi];
-                Vector3 worldPos = hitPoint
-                    + right * (pt.x * halfSize)
-                    + fwd   * (pt.y * halfSize)
-                    + up    * surfaceOffset;
-
-                lr.SetPosition(pi, worldPos);
-            }
-        }
+        // クワッド全体を hitPoint に配置し、表面の法線に合わせて回転
+        previewRoot.transform.position = hitPoint;
+        previewRoot.transform.rotation = hitRotation;
     }
 
     private void SetPreviewVisible(bool visible)
     {
-        foreach (var lr in previewLines)
-            if (lr != null) lr.enabled = visible;
+        if (previewQuadRenderer != null) previewQuadRenderer.enabled = visible;
     }
 
     private void DestroyPreview()
     {
-        previewLines.Clear();
+        if (previewTexture != null)
+        {
+            Destroy(previewTexture);
+            previewTexture = null;
+        }
+        if (previewQuadRenderer != null && previewQuadRenderer.material != null)
+        {
+            Destroy(previewQuadRenderer.material);
+        }
         if (previewRoot != null) Destroy(previewRoot);
-        previewRoot = null;
+
+        previewRoot         = null;
+        previewQuad         = null;
+        previewQuadRenderer = null;
     }
 
     // ────────────────────────────────────────────

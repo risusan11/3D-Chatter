@@ -3,6 +3,7 @@ using Photon.Realtime;
 using System.Collections;
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.SceneManagement;          
 
 public class AsyncLoader : MonoBehaviourPunCallbacks
 {
@@ -18,7 +19,8 @@ public class AsyncLoader : MonoBehaviourPunCallbacks
             
     public override void OnConnectedToMaster() {
         loadSlider.value = 0.5f;
-        PhotonNetwork.JoinOrCreateRoom("Room", new RoomOptions(), TypedLobby.Default);
+        //PhotonNetwork.JoinOrCreateRoom("Room", new RoomOptions(), TypedLobby.Default);
+        SceneManager.LoadScene("Lobby");
     }
 
     public override void OnJoinedRoom() {
