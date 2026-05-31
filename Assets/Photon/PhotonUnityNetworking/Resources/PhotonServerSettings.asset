@@ -43,6 +43,10 @@ MonoBehaviour:
   - Fire
   - MakeText
   - RespawnSpaceship
+  - RequestDestroy
+  - EraseStrokeRemote
+  - Erase3DStrokeRemote
+  - SyncSpawn3DStroke
   DisableAutoOpenWizard: 1
   ShowSettings: 1
   DevRegionSetOnce: 1

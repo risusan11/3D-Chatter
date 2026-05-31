@@ -11,28 +11,42 @@ public class TwoDimensionStroke : MonoBehaviour
 {
     [SerializeField] Camera drawingCamera;
     [SerializeField] Material lineMaterial;
-    [SerializeField] Color lineColor;
+    [SerializeField] Color lineColor = Color.white; // ブラシの現在色
     [Range(0.1f, 0.5f)] float lineWidth = 0.1f;
 
     bool isDrawing = false;
+
+    [Header("🏗️ UI一括管理パネル（MenuPanelをハメる）")]
+    [SerializeField] private GameObject menuPanel; // 💡これ1つで背景ごと全部管理する！
 
     [SerializeField] Slider WeightSlider;
     [SerializeField] Button ExitButton;
     [SerializeField] Button SavingButton;
     [SerializeField] Button ClearButton;
+
+    [Header("🎨 カラーピッカーアセットの設定")]
+    [SerializeField] private FlexibleColorPicker colorPicker; 
     
     List<LineRenderer> lineRenderers;
+
+    // ── 3D配置システムと連動する内部データ ──
+    private DrawingData drawingData = new DrawingData();
+    private StrokeData currentStrokeData;
 
     void Start()
     {
         isDrawing = true;
-        WeightSlider.gameObject.SetActive(false);
-        ExitButton.gameObject.SetActive(false);
-        SavingButton.gameObject.SetActive(false);
-        ClearButton.gameObject.SetActive(false);
         
+        // 💡 起動時はメニューパネル（背景と中のUI全部）を眠らせておく
+        if (menuPanel != null) menuPanel.SetActive(false);
+
         lineRenderers = new List<LineRenderer>();
         WeightSlider.value = lineWidth;
+
+        if (DrawingManager.Instance == null)
+        {
+            new GameObject("DrawingManager").AddComponent<DrawingManager>();
+        }
 
         SavingButton.onClick.AddListener(OnSaveAndClick);
         ClearButton.onClick.AddListener(ClearAllLines);
@@ -41,6 +55,13 @@ public class TwoDimensionStroke : MonoBehaviour
         WeightSlider.onValueChanged.AddListener((val) => {
             lineWidth = val;
         });
+
+        if (colorPicker != null)
+        {
+            colorPicker.onColorChange.AddListener((newColor) => {
+                lineColor = newColor; 
+            });
+        }
     }
 
     void Update()
@@ -53,10 +74,9 @@ public class TwoDimensionStroke : MonoBehaviour
         if (Input.GetKeyUp(KeyCode.Escape))
         {
             isDrawing = false;
-            WeightSlider.gameObject.SetActive(true);
-            ExitButton.gameObject.SetActive(true);
-            SavingButton.gameObject.SetActive(true);
-            ClearButton.gameObject.SetActive(true);
+            
+            // 💡 Escapeを押したら背景パネルごと一発で全UIを表示！
+            if (menuPanel != null) menuPanel.SetActive(true);
         }
 
         if (!isDrawing) return;
@@ -79,28 +99,31 @@ public class TwoDimensionStroke : MonoBehaviour
             if (line != null) Destroy(line.gameObject);
         }
         lineRenderers.Clear();
+        drawingData = new DrawingData();
     }
 
     void CloseMenu()
     {
-        WeightSlider.gameObject.SetActive(false);
-        ExitButton.gameObject.SetActive(false);
-        SavingButton.gameObject.SetActive(false);
-        ClearButton.gameObject.SetActive(false);
+        // 💡 閉じる時もパネルごと一発で非表示にするだけ
+        if (menuPanel != null) menuPanel.SetActive(false);
+        
         isDrawing = true;
     }
 
     void OnSaveAndClick()
     {
+        if (drawingData != null && !drawingData.IsEmpty)
+        {
+            DrawingManager.Instance.SaveDrawing(drawingData);
+        }
+
         StartCoroutine(SaveCanvasAsImageAndLoad());
     }
 
     IEnumerator SaveCanvasAsImageAndLoad()
     {
-        WeightSlider.gameObject.SetActive(false);
-        ExitButton.gameObject.SetActive(false);
-        SavingButton.gameObject.SetActive(false);
-        ClearButton.gameObject.SetActive(false);
+        // 💡 写真を撮る時はメニューパネル（背景含め全部）を隠す
+        if (menuPanel != null) menuPanel.SetActive(false);
 
         yield return new WaitForEndOfFrame();
 
@@ -124,13 +147,9 @@ public class TwoDimensionStroke : MonoBehaviour
         LoadingScene();
     }
 
-    // --- 描画ロジック群 ---
     void _addLineObject()
     {
         GameObject lineObj = new GameObject("Stroke");
-        
-        // 💡【修正】このスクリプト（2DCanvasシーン）の子供にする！
-        // これでシーン破棄時に描いた線も連動して綺麗に削除されます
         lineObj.transform.SetParent(transform);
         
         LineRenderer lr = lineObj.AddComponent<LineRenderer>();
@@ -138,18 +157,32 @@ public class TwoDimensionStroke : MonoBehaviour
         lineObj.transform.localPosition = Vector3.zero;
 
         _initRenderers();
+
+        currentStrokeData = new StrokeData
+        {
+            colorHex = "#" + ColorUtility.ToHtmlStringRGBA(lineColor),
+            normalizedWidth = lineWidth * 0.05f 
+        };
+        drawingData.strokes.Add(currentStrokeData);
     }
 
-    void _initRenderers()
+void _initRenderers()
     {
         LineRenderer lastLine = lineRenderers.Last();
         lastLine.positionCount = 0;
         lastLine.material = lineMaterial;
-        lastLine.material.color = lineColor;
+        lastLine.material.color = lineColor; 
         lastLine.startWidth = lineWidth;
         lastLine.endWidth = lineWidth;
         lastLine.useWorldSpace = true;
+        
+        // 💡 犯人はここ！sortingOrderは線同士の重なり順を管理していますが、
+        // 別のレイヤー（UI）との前後関係までは制御できていませんでした。
         lastLine.sortingOrder = lineRenderers.Count;
+
+        // ✨【解決策】この線をお絵描き専用のSorting Layer「Drawing」に割り当てる！
+        // ※スペルミスに注意してね！ステップ1で作った名前と完全に一致させます。
+        lastLine.sortingLayerName = "Drawing"; 
     }
 
     void _addPositionDataToLineRendererList()
@@ -161,14 +194,15 @@ public class TwoDimensionStroke : MonoBehaviour
         if (lastLine.positionCount > 0)
         {
             Vector3 lastPoint = lastLine.GetPosition(lastLine.positionCount - 1);
-            if (Vector3.Distance(lastPoint, worldPosition) < 0.05f)
-            {
-                return;
-            }
+            if (Vector3.Distance(lastPoint, worldPosition) < 0.05f) return;
         }
 
         lastLine.positionCount += 1;
         lastLine.SetPosition(lastLine.positionCount - 1, worldPosition);
+
+        float normX = (Input.mousePosition.x / Screen.width) * 2f - 1f;
+        float normY = (Input.mousePosition.y / Screen.height) * 2f - 1f;
+        currentStrokeData.points.Add(new StrokePointData(normX, normY));
     }
 
     void LoadingScene()
@@ -187,7 +221,7 @@ public class TwoDimensionStroke : MonoBehaviour
 
     void BackToChatScene()
     {
-        SceneManager.UnloadSceneAsync(gameObject.scene); // 💡より安全な自身のシーン指定に変更
+        SceneManager.UnloadSceneAsync(gameObject.scene); 
         RealisingMessageController.isidel = false;
     }
 }

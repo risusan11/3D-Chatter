@@ -13,7 +13,7 @@ TagManager:
   - 
   - Water
   - UI
-  - 
+  - Player
   - 
   - 
   - 
@@ -42,4 +42,10 @@ TagManager:
   m_SortingLayers:
   - name: Default
     uniqueID: 0
+    locked: 0
+  - name: Drawing
+    uniqueID: 2244349923
+    locked: 0
+  - name: UI_Menu
+    uniqueID: 3579496371
     locked: 0
