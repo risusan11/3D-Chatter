@@ -153,7 +153,9 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: Make A Room
+  m_Text: 'Back to lobby
+
+'
 --- !u!1 &1692666682095700859
 GameObject:
   m_ObjectHideFlags: 0
@@ -1477,7 +1479,7 @@ GameObject:
   - component: {fileID: 6333191177574347240}
   - component: {fileID: 2820820009718765038}
   m_Layer: 5
-  m_Name: RoomGenerater
+  m_Name: BackButton
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -1597,7 +1599,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e03e8bb84aef58a42ac4b67253ebfd4d, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  mapA: {fileID: 6333191177574347240}
+  backButton: {fileID: 6333191177574347240}
 --- !u!1 &8791193879385140549
 GameObject:
   m_ObjectHideFlags: 0
