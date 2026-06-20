@@ -14,6 +14,11 @@ public class SettingSeanceLoader : MonoBehaviour
     void Start()
     {
         mapInputField.gameObject.SetActive(false);
+        LobbyManager.roomSceneName = "Main";
+        ButtonText.text = "Main will be loaded";
+//初期設定
+
+        mapInputField.gameObject.SetActive(false);
         SettingSceneButton.onClick.AddListener(() =>
         {
             switch (LobbyManager.roomSceneName)

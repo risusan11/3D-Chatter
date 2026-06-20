@@ -81,16 +81,20 @@ using UnityEngine;
 public class PlayerCameraControl : MonoBehaviourPun
 {
     public GameObject cam;
-    
-    // 🌟 変更: static にして「共有の設定値」にする（XとYを1つにまとめました）
-    public static float sharedSensitivity = 3f;
+    public GameObject bodyMesh;
 
+    public static float sharedSensitivity = 3f;
     bool cursorLock = true;
     float xRotation = 0f;
+    private PhotonView rootPhotonView;
 
     void Start()
     {
-        if (!photonView.IsMine)
+        rootPhotonView = GetComponentInParent<PhotonView>();
+
+        if (rootPhotonView == null) return;
+
+        if (!rootPhotonView.IsMine)
         {
             Camera cameraComponent = cam.GetComponent<Camera>();
             if (cameraComponent != null) cameraComponent.enabled = false;
@@ -100,19 +104,29 @@ public class PlayerCameraControl : MonoBehaviourPun
             
             return;
         }
+
+        if (rootPhotonView.IsMine)
+        {
+            Camera myTargetCamera = cam.GetComponent<Camera>();
+            if (myTargetCamera != null)
+            {
+                int playerBodyLayer = LayerMask.NameToLayer("PlayerBody");
+                if (playerBodyLayer != -1 && bodyMesh != null)
+                {
+                    SetLayerRecursively(bodyMesh, playerBodyLayer);
+
+                    myTargetCamera.cullingMask &= ~(1 << playerBodyLayer);
+                }
+            }
+        }
     }
 
     void Update()
     {
-        if (RealisingMessageController.isidel) return; // ロード後はこのスクリプトの処理を止める
-        if (!photonView.IsMine) return;
-
+        if (rootPhotonView == null || !rootPhotonView.IsMine) return;
+        if (RealisingMessageController.isidel) return; 
         if (RealisingMessageController.isCanvas2Active || RealisingMessageController.isChatting) return;
-        
-        // 🌟 追加: チャット中や設定画面を開いている時はカメラを動かさない
-        if (RealisingMessageController.isChatting || RealisingMessageController.isCanvas2Active) return;
 
-        // 🌟 変更: static な sharedSensitivity を使う
         float mouseX = Input.GetAxis("Mouse X") * sharedSensitivity;
         float mouseY = Input.GetAxis("Mouse Y") * sharedSensitivity;
 
@@ -121,36 +135,28 @@ public class PlayerCameraControl : MonoBehaviourPun
         cam.transform.localRotation = Quaternion.Euler(xRotation, 0f, 0f);
 
         transform.Rotate(Vector3.up * mouseX);
-
         UpdateCursorLock();
     }
 
     public void UpdateCursorLock()
     {
-        // 🌟 追加: 設定画面を開いている時は、左クリックによるロック処理を無視する
         if (RealisingMessageController.isCanvas2Active) return;
 
-        if(Input.GetKeyDown(KeyCode.Escape))
-        {
-            cursorLock = false;
-        }
+        if(Input.GetKeyDown(KeyCode.Escape)) cursorLock = false;
         else if(Input.GetMouseButtonDown(0))
         {
             if (UnityEngine.EventSystems.EventSystem.current != null && 
-                UnityEngine.EventSystems.EventSystem.current.IsPointerOverGameObject())
-            {
-                return; 
-            }
+                UnityEngine.EventSystems.EventSystem.current.IsPointerOverGameObject()) return; 
             cursorLock = true;
         }
 
-        if (cursorLock)
-        {
-            Cursor.lockState = CursorLockMode.Locked;
-        }
-        else
-        {
-            Cursor.lockState = CursorLockMode.None;
-        }
+        if (cursorLock) Cursor.lockState = CursorLockMode.Locked;
+        else Cursor.lockState = CursorLockMode.None;
+    }
+    void SetLayerRecursively(GameObject obj, int layer)
+    {
+    obj.layer = layer;
+        foreach (Transform child in obj.transform)
+            SetLayerRecursively(child.gameObject, layer);
     }
 }

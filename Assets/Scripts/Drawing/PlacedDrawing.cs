@@ -2,18 +2,6 @@ using System.Collections.Generic;
 using UnityEngine;
 using Photon.Pun;
 
-/// <summary>
-/// テクスチャ方式 PlacedDrawing。
-///
-/// 【視覚】StrokeTextureRenderer で描画データをテクスチャに焼いてクワッドに貼る。
-///        → 2D の「円スタンプ塗りつぶし」を 3D で完全再現。
-///
-/// 【消しゴム検出】透明な LineRenderer を裏で保持し、DrawingPlacer の
-///        スクリーン空間スキャンがそのまま動く。
-///        → DrawingPlacer.cs の変更不要。
-///
-/// 【消去時】DrawingData から該当ストロークを除外して再テクスチャ描画。
-/// </summary>
 [RequireComponent(typeof(PhotonView))]
 public class PlacedDrawing : MonoBehaviourPun, IPunInstantiateMagicCallback
 {

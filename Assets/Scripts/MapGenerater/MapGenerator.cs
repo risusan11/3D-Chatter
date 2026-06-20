@@ -2,10 +2,11 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
-public class MapGenerator : MonoBehaviour
+using Photon.Pun;
+using Photon.Realtime;   // 🌟 追加：コールバックを使うため
+
+public class MapGenerator : MonoBehaviourPunCallbacks   
 {
-    
-    // Start is called before the first frame update
     [SerializeField] private GameObject LandprefabA;
     [SerializeField] private GameObject LandprefabB;
 
@@ -14,53 +15,98 @@ public class MapGenerator : MonoBehaviour
     private float stepHeight = 1.0f;   // 厚み 1m
     private string inputText;
     private string testMapData;
+
+    private bool hasBuilt = false;   
+
     void Start()
     {
-        testMapData = MapGeneratorSettingMangager.mapData;
-        GenerateMap(testMapData);
+        Debug.Log($"[MapGen] Start呼ばれた / InRoom={PhotonNetwork.InRoom}");
+
+        if (PhotonNetwork.InRoom)
+        {
+            TryBuildMap();
+        }
     }
 
-
-public void GenerateMap(string mapString)
+    public override void OnJoinedRoom()
     {
-        string[] rows = mapString.Split('\n');// z座標の行ごとに分割してる処理
+        Debug.Log("[MapGen] OnJoinedRoom呼ばれた");
+        TryBuildMap();
+    }
 
-        for (int z = 0; z < rows.Length; z++)// z座標の行ごとにループしてる処理
+    private void TryBuildMap()
+    {
+        if (hasBuilt) return;   
+
+        if (PhotonNetwork.CurrentRoom != null &&
+            PhotonNetwork.CurrentRoom.CustomProperties.TryGetValue("mapData", out object value))
         {
-            string[] columns = rows[z].Split(',');// x座標の列ごとに分割してる処理
+            Debug.Log($"[MapGen] 🌟 mapData読めた = '{value as string}'");
+            GenerateMap(value as string);
+            hasBuilt = true;
+        }
+        else
+        {
+            Debug.LogWarning("[MapGen] ⚠️ mapDataがまだ読めない（プロパティ未着 or キー無し）");
+        }
+    }
 
-            for (int x = 0; x < columns.Length; x++)// x座標の列ごとにループしてる処理
+    public void GenerateMap(string mapString)
+    {
+        if (string.IsNullOrEmpty(mapString))
+        {
+            Debug.LogWarning("[MapGen] ⚠️ Map string is empty or null.");
+            return;
+        }
+
+        string[] rows = mapString.Split('\n');
+
+        for (int z = 0; z < rows.Length; z++)
+        {
+            string[] columns = rows[z].Split(',');
+
+            for (int x = 0; x < columns.Length; x++)
             {
-                string tileData = columns[x].Trim(); 
+                string tileData = columns[x].Trim();
                 if (string.IsNullOrEmpty(tileData) || tileData.Length < 2) continue;
 
-                char type = tileData[0];//一つ目の文字をタイプとして取得してる処理
-                
+                char type = tileData[0];
+
                 if (int.TryParse(tileData.Substring(1), out int heightLevel))
                 {
-                    float posX = x * blockWidth;// x座標の位置を計算してる処理
-                    float posZ = -z * blockLength;// z座標の位置を計算してる処理
-                    
-                   
-                    float posY = (heightLevel * stepHeight) + (stepHeight / 2.0f);
-
-                    Vector3 spawnPosition = new Vector3(posX, posY, posZ);
-
-                    if (type == 'a')
-                    {
-                        Instantiate(LandprefabA, spawnPosition, Quaternion.identity);
-                    }
-                    else if (type == 'b')
-                    {
-                        Instantiate(LandprefabB, spawnPosition, Quaternion.identity);
-                    }
+                    SpawnColumn(type, x, z, heightLevel);
                 }
             }
         }
     }
-    // Update is called once per frame
+
+    private void SpawnColumn(char type, int x, int z, int heightLevel)
+    {
+        GameObject prefab = (type == 'a') ? LandprefabA
+                        : (type == 'b') ? LandprefabB
+                        : null;
+        if (prefab == null)
+        {
+            Debug.LogWarning($"[MapGen] ⚠️ prefabがnull（type='{type}'）。Inspectorの割り当てを確認");
+            return;
+        }
+
+        int   blocks       = heightLevel + 1;
+        float pillarHeight = blocks * stepHeight;
+
+        float posX = x * blockWidth;
+        float posZ = -z * blockLength;
+        float posY = pillarHeight * 0.5f;
+
+        GameObject col = Instantiate(prefab, new Vector3(posX, posY, posZ), Quaternion.identity);
+
+        Vector3 s = col.transform.localScale;
+        s.y *= blocks;
+        col.transform.localScale = s;
+    }
+
     void Update()
     {
-        
+
     }
 }

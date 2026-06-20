@@ -1,4 +1,4 @@
-using Photon.Pun;
+/*using Photon.Pun;
 using Photon.Realtime;
 using UnityEngine;
 
@@ -30,6 +30,42 @@ public class SampleScene : MonoBehaviourPunCallbacks
         // 既に生成済みでないかチェック（二重生成防止）
         // 自分のPhotonViewがシーン内にない場合のみ生成する
         var position = new Vector3(Random.Range(-3f, 3f), Random.Range(-3f, 3f));
+        PhotonNetwork.Instantiate("Avatar", position, Quaternion.identity);
+    }
+}*/
+
+using Photon.Pun;
+using Photon.Realtime;
+using UnityEngine;
+
+public class SampleScene : MonoBehaviourPunCallbacks
+{
+    void Awake()
+    {
+        PhotonNetwork.IsMessageQueueRunning = true;
+    }
+
+    void Start()
+    {
+        if (PhotonNetwork.InRoom)
+        {
+            SpawnPlayer();
+        }
+    }
+
+    public override void OnJoinedRoom()
+    {
+        SpawnPlayer();
+    }
+
+    private void SpawnPlayer()
+    {
+
+        float randomX = Random.Range(-5f, 5f);
+        float randomZ = Random.Range(-5f, 5f);
+        float spawnHeight = 0.5f; 
+        Vector3 position = new Vector3(randomX, spawnHeight, randomZ);
+
         PhotonNetwork.Instantiate("Avatar", position, Quaternion.identity);
     }
 }
